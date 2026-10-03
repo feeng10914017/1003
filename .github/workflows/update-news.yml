@@ -1,0 +1,55 @@
+# 世界脈動 World Pulse — 自動更新新聞並發布網站
+#
+# 什麼時候會執行：
+#   1. 每小時一次（自動抓最新 RSS）
+#   2. 你上傳／修改檔案到 main 分支時
+#   3. 在 GitHub 的 Actions 分頁手動按「Run workflow」
+#
+# 第一次使用前，請到 repo 的 Settings → Pages → Build and deployment → Source
+# 選「GitHub Actions」。
+
+name: 更新新聞並發布網站
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # 每小時第 17 分鐘（避開整點尖峰）
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 取得網站檔案
+        uses: actions/checkout@v7
+
+      - name: 設定 GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: 抓取 RSS 新聞、產生分享頁
+        run: python3 scripts/fetch_news.py
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+
+      - name: 打包網站
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+
+      - name: 發布網站
+        id: deployment
+        uses: actions/deploy-pages@v5
